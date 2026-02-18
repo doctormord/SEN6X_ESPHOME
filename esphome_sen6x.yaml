@@ -89,7 +89,8 @@ binary_sensor:
       return true;
 
 logger:
-  level: DEBUG
+  level: INFO
+  baud_rate: 0
 
 i2c:
   sda: ${pin_sda}
@@ -1055,3 +1056,4 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
     default_transition_length: 1s
+
