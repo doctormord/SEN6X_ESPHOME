@@ -31,10 +31,7 @@ esphome:
           id: display_backlight
           brightness: 100% 
       - script.execute: apply_theme
-      
-      # HIER: Unser Skript wird beim Start wieder aufgerufen!
       - script.execute: sensor_update_loop
-      
       - script.execute: display_update_loop
       - wait_until: { time.has_time: }
       - script.execute: update_backlight
@@ -67,6 +64,10 @@ wifi:
 
 captive_portal:
 
+web_server:
+  port: 80
+  version: 2
+
 external_components:
   - source:
       type: git
@@ -81,7 +82,7 @@ binary_sensor:
     sen6x_id: sen54
 
   - platform: template
-    name: "SEN66 Betriebsbereit"
+    name: "SEN66 Ready"
     id: sensor_functional
     lambda: |-
       if (std::isnan(id(my_co2).state)) return false;
@@ -89,7 +90,6 @@ binary_sensor:
 
 logger:
   level: DEBUG
-  # baud: 0
 
 i2c:
   sda: ${pin_sda}
@@ -148,7 +148,7 @@ lvgl:
     - arc: { id: arc_inner, width: 184, height: 184, align: CENTER, start_angle: 135, end_angle: 45, arc_width: 10 }
 
 script:
-  # HIER: Der verlorene 24-Stunden-Trick ist wieder da!
+  # HERE: The lost 24-hour trick is back!
   - id: sensor_update_loop
     mode: restart
     then:
@@ -323,7 +323,7 @@ script:
 sensor:
   - platform: sen6x
     id: sen54
-    # HIER: Wieder auf 24h gesetzt, damit die Gas Engine nicht resettet!
+    # HERE: Set back to 24h so the gas engine doesn't reset!
     update_interval: 24h
     co2: { id: my_co2, name: "CO2" }
     pm_1_0: { id: my_pm1, name: "PM 1.0" }
@@ -336,13 +336,13 @@ sensor:
     humidity: { id: raw_hum, internal: true }
 
   - platform: template
-    name: "Temperatur"
+    name: "Temperature"
     id: my_temp
     unit_of_measurement: "°C"
     lambda: "return id(raw_temp).state + id(offset_temp).state;"
   
   - platform: template
-    name: "Luftfeuchtigkeit"
+    name: "Humidity"
     id: my_hum
     unit_of_measurement: "%"
     lambda: |-
@@ -383,10 +383,10 @@ text_sensor:
     ssid:
       name: "Connected SSID"
 
-# --- FARBEN ---
+# --- COLORS ---
 text:
   - platform: template
-    name: "Farbe: Gut"
+    name: "Color: Good"
     id: color_good
     mode: text
     entity_category: config
@@ -396,7 +396,7 @@ text:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Farbe: Stufe 1"
+    name: "Color: Level 1"
     id: color_lim1
     mode: text
     entity_category: config
@@ -406,7 +406,7 @@ text:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Farbe: Stufe 2"
+    name: "Color: Level 2"
     id: color_lim2
     mode: text
     entity_category: config
@@ -416,7 +416,7 @@ text:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Farbe: Stufe 3"
+    name: "Color: Level 3"
     id: color_lim3
     mode: text
     entity_category: config
@@ -426,7 +426,7 @@ text:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Theme Dark: Hintergrund"
+    name: "Theme Dark: Background"
     id: color_bg_dark
     mode: text
     entity_category: config
@@ -446,7 +446,7 @@ text:
     on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
-    name: "Theme Dark: Arc Inaktiv"
+    name: "Theme Dark: Arc Inactive"
     id: color_ic_dark
     mode: text
     entity_category: config
@@ -456,7 +456,7 @@ text:
     on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
-    name: "Theme Light: Hintergrund"
+    name: "Theme Light: Background"
     id: color_bg_light
     mode: text
     entity_category: config
@@ -476,7 +476,7 @@ text:
     on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
-    name: "Theme Light: Arc Inaktiv"
+    name: "Theme Light: Arc Inactive"
     id: color_ic_light
     mode: text
     entity_category: config
@@ -506,7 +506,7 @@ select:
         - script.execute: apply_theme
 
   - platform: template
-    name: "Zuweisung: Große Zahl"
+    name: "Assignment: Main Value"
     id: sel_main
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -516,7 +516,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Zuweisung: Bogen Außen"
+    name: "Assignment: Outer Arc"
     id: sel_arc_out
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -526,7 +526,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Zuweisung: Bogen Mitte"
+    name: "Assignment: Middle Arc"
     id: sel_arc_mid
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -536,7 +536,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Zuweisung: Bogen Innen"
+    name: "Assignment: Inner Arc"
     id: sel_arc_in
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -546,7 +546,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Slot 1 (Links Oben)"
+    name: "Slot 1 (Top Left)"
     id: sel_s1
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -556,7 +556,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
   
   - platform: template
-    name: "Slot 2 (Rechts Oben)"
+    name: "Slot 2 (Top Right)"
     id: sel_s2
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -566,7 +566,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Slot 3 (Links Mitte)"
+    name: "Slot 3 (Mid Left)"
     id: sel_s3
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -576,7 +576,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Slot 4 (Rechts Mitte)"
+    name: "Slot 4 (Mid Right)"
     id: sel_s4
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -586,7 +586,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Slot 5 (Links Unten)"
+    name: "Slot 5 (Bottom Left)"
     id: sel_s5
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -596,7 +596,7 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Slot 6 (Rechts Unten)"
+    name: "Slot 6 (Bottom Right)"
     id: sel_s6
     entity_category: config
     options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
@@ -606,11 +606,11 @@ select:
     on_value: { then: [ script.execute: display_update_loop ] }
 
 
-# --- 21 GRENZWERTE ---
+# --- 21 THRESHOLDS ---
 number:
   # CO2
   - platform: template
-    name: "Limit: CO2 Stufe 1"
+    name: "Limit: CO2 Level 1"
     id: lim_co2_1
     mode: box
     entity_category: config
@@ -622,7 +622,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: CO2 Stufe 2"
+    name: "Limit: CO2 Level 2"
     id: lim_co2_2
     mode: box
     entity_category: config
@@ -634,7 +634,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: CO2 Stufe 3"
+    name: "Limit: CO2 Level 3"
     id: lim_co2_3
     mode: box
     entity_category: config
@@ -648,7 +648,7 @@ number:
 
   # PM 1.0
   - platform: template
-    name: "Limit: PM 1.0 Stufe 1"
+    name: "Limit: PM 1.0 Level 1"
     id: lim_pm1_1
     mode: box
     entity_category: config
@@ -660,7 +660,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 1.0 Stufe 2"
+    name: "Limit: PM 1.0 Level 2"
     id: lim_pm1_2
     mode: box
     entity_category: config
@@ -672,7 +672,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 1.0 Stufe 3"
+    name: "Limit: PM 1.0 Level 3"
     id: lim_pm1_3
     mode: box
     entity_category: config
@@ -686,7 +686,7 @@ number:
 
   # PM 2.5
   - platform: template
-    name: "Limit: PM 2.5 Stufe 1"
+    name: "Limit: PM 2.5 Level 1"
     id: lim_pm25_1
     mode: box
     entity_category: config
@@ -698,7 +698,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 2.5 Stufe 2"
+    name: "Limit: PM 2.5 Level 2"
     id: lim_pm25_2
     mode: box
     entity_category: config
@@ -710,7 +710,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 2.5 Stufe 3"
+    name: "Limit: PM 2.5 Level 3"
     id: lim_pm25_3
     mode: box
     entity_category: config
@@ -724,7 +724,7 @@ number:
 
   # PM 4.0
   - platform: template
-    name: "Limit: PM 4.0 Stufe 1"
+    name: "Limit: PM 4.0 Level 1"
     id: lim_pm4_1
     mode: box
     entity_category: config
@@ -736,7 +736,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 4.0 Stufe 2"
+    name: "Limit: PM 4.0 Level 2"
     id: lim_pm4_2
     mode: box
     entity_category: config
@@ -748,7 +748,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 4.0 Stufe 3"
+    name: "Limit: PM 4.0 Level 3"
     id: lim_pm4_3
     mode: box
     entity_category: config
@@ -762,7 +762,7 @@ number:
 
   # PM 10
   - platform: template
-    name: "Limit: PM 10 Stufe 1"
+    name: "Limit: PM 10 Level 1"
     id: lim_pm10_1
     mode: box
     entity_category: config
@@ -774,7 +774,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 10 Stufe 2"
+    name: "Limit: PM 10 Level 2"
     id: lim_pm10_2
     mode: box
     entity_category: config
@@ -786,7 +786,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: PM 10 Stufe 3"
+    name: "Limit: PM 10 Level 3"
     id: lim_pm10_3
     mode: box
     entity_category: config
@@ -800,7 +800,7 @@ number:
 
   # VOC
   - platform: template
-    name: "Limit: VOC Stufe 1"
+    name: "Limit: VOC Level 1"
     id: lim_voc_1
     mode: box
     entity_category: config
@@ -812,7 +812,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: VOC Stufe 2"
+    name: "Limit: VOC Level 2"
     id: lim_voc_2
     mode: box
     entity_category: config
@@ -824,7 +824,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: VOC Stufe 3"
+    name: "Limit: VOC Level 3"
     id: lim_voc_3
     mode: box
     entity_category: config
@@ -838,7 +838,7 @@ number:
 
   # NOx
   - platform: template
-    name: "Limit: NOx Stufe 1"
+    name: "Limit: NOx Level 1"
     id: lim_nox_1
     mode: box
     entity_category: config
@@ -850,7 +850,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: NOx Stufe 2"
+    name: "Limit: NOx Level 2"
     id: lim_nox_2
     mode: box
     entity_category: config
@@ -862,7 +862,7 @@ number:
     restore_value: true
     on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
-    name: "Limit: NOx Stufe 3"
+    name: "Limit: NOx Level 3"
     id: lim_nox_3
     mode: box
     entity_category: config
@@ -875,9 +875,9 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
 
-  # --- BESTEHENDE SYSTEM NUMBER SLIDER ---
+  # --- EXISTING SYSTEM NUMBER SLIDERS ---
   - platform: template
-    name: "Sensor Update Intervall"
+    name: "Sensor Update Interval"
     id: sensor_update_slider
     entity_category: config
     min_value: 5
@@ -887,12 +887,12 @@ number:
     optimistic: true
     restore_value: true
     on_value:
-      # HIER: Der alte "call_setup()" Quatsch ist weg. Wir starten nur das Skript neu!
+      # HERE: The old "call_setup()" nonsense is gone. We only restart the script!
       then:
         - script.execute: sensor_update_loop
 
   - platform: template
-    name: "Display Refresh Intervall"
+    name: "Display Refresh Interval"
     id: display_update_slider
     entity_category: config
     min_value: 1
@@ -904,7 +904,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
         
   - platform: template
-    name: "Helligkeit Tag"
+    name: "Brightness Day"
     id: brightness_day
     entity_category: config
     unit_of_measurement: "%"
@@ -917,7 +917,7 @@ number:
     on_value: { then: [ script.execute: update_backlight ] }
 
   - platform: template
-    name: "Helligkeit Nacht"
+    name: "Brightness Night"
     id: brightness_night
     entity_category: config
     unit_of_measurement: "%"
@@ -930,7 +930,7 @@ number:
     on_value: { then: [ script.execute: update_backlight ] }
 
   - platform: template
-    name: "Bogen Außen: Min Wert"
+    name: "Outer Arc: Min Value"
     id: num_arc_out_min
     mode: box
     entity_category: config
@@ -943,7 +943,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Bogen Außen: Max Wert"
+    name: "Outer Arc: Max Value"
     id: num_arc_out_max
     mode: box
     entity_category: config
@@ -956,7 +956,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Bogen Mitte: Min Wert"
+    name: "Middle Arc: Min Value"
     id: num_arc_mid_min
     mode: box
     entity_category: config
@@ -969,7 +969,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Bogen Mitte: Max Wert"
+    name: "Middle Arc: Max Value"
     id: num_arc_mid_max
     mode: box
     entity_category: config
@@ -982,7 +982,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Bogen Innen: Min Wert"
+    name: "Inner Arc: Min Value"
     id: num_arc_in_min
     mode: box
     entity_category: config
@@ -995,7 +995,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Bogen Innen: Max Wert"
+    name: "Inner Arc: Max Value"
     id: num_arc_in_max
     mode: box
     entity_category: config
@@ -1008,7 +1008,7 @@ number:
     on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
-    name: "Kalibrierung Temperatur"
+    name: "Calibration Temperature"
     id: offset_temp
     entity_category: config
     min_value: -5.0
@@ -1019,7 +1019,7 @@ number:
     restore_value: true
 
   - platform: template
-    name: "Kalibrierung Feuchte"
+    name: "Calibration Humidity"
     id: offset_hum
     entity_category: config
     min_value: -10.0
