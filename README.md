@@ -17,6 +17,7 @@ Big Thanks at [tuct](https://github.com/tuct) for the driver and inspiration.
 * **Intelligent Backlight**: Automatic day/night brightness adjustment based on sun elevation (Sunrise/Sunset).
 * **Health Monitoring**: Visual color-coded alerts (Green/Yellow/Orange/Red) based on three-stage configurable thresholds for every pollutant.
 * **WiFi Diagnostics**: On-screen signal strength indicator (%) and auto-reboot logic for weak connections.
+* **Heat Management**: Running at half the speed (80MHz) with reduced WiFi gain helps to reduce self heating 
 
 * ### 💧 Dynamic Humidity Compensation
 Relative Humidity (RH) is highly dependent on the ambient temperature. When applying a temperature offset (e.g., to compensate for internal device heat), the raw RH value from the sensor becomes physically inaccurate. 
