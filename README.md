@@ -56,7 +56,7 @@ Once integrated, you can control the following through the Home Assistant UI:
 ## 🔧 Installation
 
 1.  Copy the YAML code into your ESPHome dashboard.
-2.  Ensure your `secrets.yaml` contains `wifi_ssid`, `wifi_password`, and `wifi_ap_password`.
+2.  Ensure your `secrets.yaml` contains `wifi_ssid`, `wifi_password`, `wifi_ap_password` and `api_key`.
 3.  Flash the ESP32-C3.
 4.  Wait for the first sync; the CO2/Gas sensors require a short warm-up period to show valid data.
 
