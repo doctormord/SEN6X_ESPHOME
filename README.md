@@ -1,4 +1,4 @@
-# ESPHome Air Quality System (SEN6x)
+# ESPHome Air Quality Sensor System (SEN6x)
 
 ![alt text](https://github.com/doctormord/SEN6X_ESPHOME/blob/main/pictures/esp32_rendering.png "SEN6X AQS")
 
