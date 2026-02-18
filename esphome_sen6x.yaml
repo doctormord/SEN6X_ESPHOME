@@ -1,0 +1,1057 @@
+substitutions:
+  id_prefix: sen6x_c3
+  node_name: aqs-sen6x-c3
+  name: "Air Quality System"
+
+  my_latitude: "52.5200"
+  my_longitude: "13.4050"
+
+  pin_sda: 'GPIO06'
+  pin_scl: 'GPIO07'
+  pin_clk: 'GPIO08'
+  pin_mosi: 'GPIO10'
+  pin_reset: 'GPIO03'
+  pin_cs: 'GPIO05'
+  pin_dc: 'GPIO04'
+  pin_backlight: 'GPIO02'
+
+globals:
+  - id: system_ready
+    type: bool
+    initial_value: 'false'
+
+esphome:
+  name: ${node_name}
+  includes:
+    - "<esp_wifi.h>"
+  on_boot:
+    priority: 600
+    then:
+      - light.turn_on:
+          id: display_backlight
+          brightness: 100% 
+      - script.execute: apply_theme
+      
+      # HIER: Unser Skript wird beim Start wieder aufgerufen!
+      - script.execute: sensor_update_loop
+      
+      - script.execute: display_update_loop
+      - wait_until: { time.has_time: }
+      - script.execute: update_backlight
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: "80"
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_key
+
+wifi:
+  power_save_mode: LIGHT
+  fast_connect: True
+  output_power: 14dB
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+    
+  ap: 
+    password: !secret wifi_ap_password
+
+captive_portal:
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/tuct/esphome-projects
+      path: components
+      ref: main
+    components: [ sen6x ]
+
+binary_sensor:
+  - platform: sen6x
+    id: sen6x_status
+    sen6x_id: sen54
+
+  - platform: template
+    name: "SEN66 Betriebsbereit"
+    id: sensor_functional
+    lambda: |-
+      if (std::isnan(id(my_co2).state)) return false;
+      return true;
+
+logger:
+  level: DEBUG
+  # baud: 0
+
+i2c:
+  sda: ${pin_sda}
+  scl: ${pin_scl}
+  scan: true
+
+spi:
+  id: spi_bus
+  clk_pin: ${pin_clk}
+  mosi_pin: ${pin_mosi}
+
+font:
+  - file: "gfonts://Rubik@700"
+    id: lv_font_large
+    size: 48
+    bpp: 4
+  - file: "gfonts://Rubik@400"
+    id: lv_font_small
+    size: 15
+    bpp: 4
+
+display:
+  - platform: ili9xxx
+    id: my_display
+    model: GC9A01A
+    spi_id: spi_bus
+    cs_pin: ${pin_cs}
+    dc_pin: ${pin_dc}
+    reset_pin: ${pin_reset}
+    data_rate: 80MHz
+    spi_mode: mode3
+    dimensions: { height: 240, width: 240 }
+    invert_colors: true
+
+lvgl:
+  displays: my_display
+  buffer_size: 20%
+  color_depth: 16
+  bg_color: 0x000000
+  update_interval: 500ms
+  widgets:
+    - label: { id: label_main, text: "---", align: CENTER, y: -40, text_font: lv_font_large }
+    - label: { id: label_row1, text: "--- | ---", align: CENTER, y: -5, text_font: lv_font_small }
+    - label: { id: label_row2, text: "--- | ---", align: CENTER, y: 20, text_font: lv_font_small }
+    - label: { id: label_row3, text: "--- | ---", align: CENTER, y: 45, text_font: lv_font_small }
+    
+    - label: 
+        id: label_wifi
+        text: "WiFi"
+        align: BOTTOM_MID
+        y: -10
+        text_font: lv_font_small
+    
+    - arc: { id: arc_outer, width: 240, height: 240, align: CENTER, start_angle: 135, end_angle: 45, arc_width: 10 }
+    - arc: { id: arc_middle, width: 212, height: 212, align: CENTER, start_angle: 135, end_angle: 45, arc_width: 10 }
+    - arc: { id: arc_inner, width: 184, height: 184, align: CENTER, start_angle: 135, end_angle: 45, arc_width: 10 }
+
+script:
+  # HIER: Der verlorene 24-Stunden-Trick ist wieder da!
+  - id: sensor_update_loop
+    mode: restart
+    then:
+      - component.update: sen54 
+      - delay: !lambda |-
+          float s = id(sensor_update_slider).state;
+          if (std::isnan(s) || s < 5) s = 30.0; 
+          return s * 1000;
+      - script.execute: sensor_update_loop
+
+  - id: display_update_loop
+    mode: restart
+    then:
+      - lambda: |-
+          if (!id(my_display).is_ready()) return;
+
+          auto get_val = [&](const std::string& t) -> float {
+            if (t == "CO2") return id(my_co2).state;
+            if (t == "PM 1.0") return id(my_pm1).state;
+            if (t == "PM 2.5") return id(my_pm25).state;
+            if (t == "PM 4.0") return id(my_pm4).state;
+            if (t == "PM 10") return id(my_pm10).state;
+            if (t == "VOC") return id(my_voc).state;
+            if (t == "NOx") return id(my_nox).state;
+            if (t == "Temp") return id(my_temp).state;
+            if (t == "Hum") return id(my_hum).state;
+            return NAN;
+          };
+
+          auto get_col = [&](const std::string& t, float v) -> lv_color_t {
+            if (std::isnan(v)) return lv_color_hex(0x555555);
+            
+            lv_color_t c_good = lv_color_hex(strtol(id(color_good).state.c_str(), NULL, 16));
+            lv_color_t c_lim1 = lv_color_hex(strtol(id(color_lim1).state.c_str(), NULL, 16));
+            lv_color_t c_lim2 = lv_color_hex(strtol(id(color_lim2).state.c_str(), NULL, 16));
+            lv_color_t c_lim3 = lv_color_hex(strtol(id(color_lim3).state.c_str(), NULL, 16));
+            
+            if (t == "CO2") {
+              if (v >= id(lim_co2_3).state) return c_lim3;
+              if (v >= id(lim_co2_2).state) return c_lim2;
+              if (v >= id(lim_co2_1).state) return c_lim1;
+            } else if (t == "PM 1.0") {
+              if (v >= id(lim_pm1_3).state) return c_lim3;
+              if (v >= id(lim_pm1_2).state) return c_lim2;
+              if (v >= id(lim_pm1_1).state) return c_lim1;
+            } else if (t == "PM 2.5") {
+              if (v >= id(lim_pm25_3).state) return c_lim3;
+              if (v >= id(lim_pm25_2).state) return c_lim2;
+              if (v >= id(lim_pm25_1).state) return c_lim1;
+            } else if (t == "PM 4.0") {
+              if (v >= id(lim_pm4_3).state) return c_lim3;
+              if (v >= id(lim_pm4_2).state) return c_lim2;
+              if (v >= id(lim_pm4_1).state) return c_lim1;
+            } else if (t == "PM 10") {
+              if (v >= id(lim_pm10_3).state) return c_lim3;
+              if (v >= id(lim_pm10_2).state) return c_lim2;
+              if (v >= id(lim_pm10_1).state) return c_lim1;
+            } else if (t == "VOC") {
+              if (v >= id(lim_voc_3).state) return c_lim3;
+              if (v >= id(lim_voc_2).state) return c_lim2;
+              if (v >= id(lim_voc_1).state) return c_lim1;
+            } else if (t == "NOx") {
+              if (v >= id(lim_nox_3).state) return c_lim3;
+              if (v >= id(lim_nox_2).state) return c_lim2;
+              if (v >= id(lim_nox_1).state) return c_lim1;
+            }
+            return c_good;
+          };
+
+          auto get_fmt = [&](const std::string& t, float v, bool is_slot) -> std::string {
+            if (t == "---" || std::isnan(v)) return "---";
+            if (is_slot) {
+              if (t == "CO2") return str_sprintf("CO2:%.0f", v);
+              if (t == "PM 1.0") return str_sprintf("PM1:%.0f", v);
+              if (t == "PM 2.5") return str_sprintf("PM2.5:%.0f", v);
+              if (t == "PM 4.0") return str_sprintf("PM4:%.0f", v);
+              if (t == "PM 10") return str_sprintf("PM10:%.0f", v);
+              if (t == "VOC") return str_sprintf("V:%.0f", v);
+              if (t == "NOx") return str_sprintf("N:%.0f", v);
+              if (t == "Temp") return str_sprintf("%.1f°C", v);
+              if (t == "Hum") return str_sprintf("%.0f%%", v);
+            } else {
+              if (t == "Temp") return str_sprintf("%.1f", v);
+              return str_sprintf("%.0f", v);
+            }
+            return "---";
+          };
+
+          bool is_l = (id(theme_select).current_option() == "Light");
+          lv_color_t arc_inact = is_l ? lv_color_hex(strtol(id(color_ic_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_ic_dark).state.c_str(), NULL, 16));
+          lv_color_t tx_main = is_l ? lv_color_hex(strtol(id(color_tx_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_tx_dark).state.c_str(), NULL, 16));
+
+          auto upd_arc = [&](lv_obj_t* arc, const std::string& t, float min_v, float max_v) {
+            lv_arc_set_range(arc, min_v, max_v);
+            float v = get_val(t);
+            if (t == "---" || std::isnan(v)) {
+              lv_arc_set_value(arc, min_v); 
+              lv_obj_set_style_arc_color(arc, arc_inact, LV_PART_INDICATOR);
+            } else {
+              lv_arc_set_value(arc, v);
+              lv_obj_set_style_arc_color(arc, get_col(t, v), LV_PART_INDICATOR);
+            }
+          };
+
+          upd_arc(id(arc_outer), id(sel_arc_out).state, id(num_arc_out_min).state, id(num_arc_out_max).state);
+          upd_arc(id(arc_middle), id(sel_arc_mid).state, id(num_arc_mid_min).state, id(num_arc_mid_max).state);
+          upd_arc(id(arc_inner), id(sel_arc_in).state, id(num_arc_in_min).state, id(num_arc_in_max).state);
+
+          std::string m_t = id(sel_main).state;
+          float m_v = get_val(m_t);
+          lv_label_set_text(id(label_main), get_fmt(m_t, m_v, false).c_str());
+          
+          if (m_t == "---" || std::isnan(m_v)) {
+            lv_obj_set_style_text_color(id(label_main), tx_main, LV_PART_MAIN);
+          } else {
+            lv_obj_set_style_text_color(id(label_main), get_col(m_t, m_v), LV_PART_MAIN);
+          }
+
+          auto r1 = get_fmt(id(sel_s1).state, get_val(id(sel_s1).state), true) + " | " + get_fmt(id(sel_s2).state, get_val(id(sel_s2).state), true);
+          auto r2 = get_fmt(id(sel_s3).state, get_val(id(sel_s3).state), true) + " | " + get_fmt(id(sel_s4).state, get_val(id(sel_s4).state), true);
+          auto r3 = get_fmt(id(sel_s5).state, get_val(id(sel_s5).state), true) + " | " + get_fmt(id(sel_s6).state, get_val(id(sel_s6).state), true);
+          
+          lv_label_set_text(id(label_row1), r1 == "--- | ---" ? "" : r1.c_str());
+          lv_label_set_text(id(label_row2), r2 == "--- | ---" ? "" : r2.c_str());
+          lv_label_set_text(id(label_row3), r3 == "--- | ---" ? "" : r3.c_str());
+          
+          std::string wifi_str = id(wifi_signal_percent).has_state() ? str_sprintf("WiFi: %.0f%%", id(wifi_signal_percent).state) : "WiFi: ---";
+          lv_label_set_text(id(label_wifi), wifi_str.c_str());
+
+      - delay: !lambda "return id(display_update_slider).state * 1000;"
+      - script.execute: display_update_loop
+
+  - id: apply_theme
+    then:
+      - lambda: |-
+          bool is_l = (id(theme_select).current_option() == "Light");
+          
+          lv_color_t bg = is_l ? lv_color_hex(strtol(id(color_bg_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_bg_dark).state.c_str(), NULL, 16));
+          lv_color_t tx = is_l ? lv_color_hex(strtol(id(color_tx_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_tx_dark).state.c_str(), NULL, 16));
+          
+          lv_obj_set_style_bg_color(lv_scr_act(), bg, LV_PART_MAIN);
+          auto s_l = [&](lv_obj_t* o, lv_color_t c) {
+              lv_obj_set_style_text_color(o, c, LV_PART_MAIN);
+              lv_obj_set_style_bg_color(o, bg, LV_PART_MAIN);
+              lv_obj_set_style_bg_opa(o, LV_OPA_COVER, LV_PART_MAIN);
+          };
+          s_l(id(label_row1), tx); s_l(id(label_row2), tx); s_l(id(label_row3), tx);
+          s_l(id(label_main), tx);
+          s_l(id(label_wifi), tx);
+
+          lv_obj_set_style_arc_color(id(arc_outer), bg, LV_PART_MAIN);
+          lv_obj_set_style_arc_color(id(arc_middle), bg, LV_PART_MAIN);
+          lv_obj_set_style_arc_color(id(arc_inner), bg, LV_PART_MAIN);
+      - script.execute: display_update_loop
+
+  - id: update_backlight
+    then:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(sntp_time).now().is_valid()) return true;
+              return id(sun_id).is_above_horizon(); 
+          then:
+            - light.turn_on:
+                id: display_backlight
+                brightness: !lambda "return id(brightness_day).state / 100.0;"
+          else:
+            - light.turn_on:
+                id: display_backlight
+                brightness: !lambda "return id(brightness_night).state / 100.0;"
+
+sensor:
+  - platform: sen6x
+    id: sen54
+    # HIER: Wieder auf 24h gesetzt, damit die Gas Engine nicht resettet!
+    update_interval: 24h
+    co2: { id: my_co2, name: "CO2" }
+    pm_1_0: { id: my_pm1, name: "PM 1.0" }
+    pm_2_5: { id: my_pm25, name: "PM 2.5" }
+    pm_4_0: { id: my_pm4, name: "PM 4.0" }
+    pm_10_0: { id: my_pm10, name: "PM 10" }
+    voc: { id: my_voc, name: "VOC Index" }
+    nox: { id: my_nox, name: "NOx Index" }
+    temperature: { id: raw_temp, internal: true }
+    humidity: { id: raw_hum, internal: true }
+
+  - platform: template
+    name: "Temperatur"
+    id: my_temp
+    unit_of_measurement: "°C"
+    lambda: "return id(raw_temp).state + id(offset_temp).state;"
+  
+  - platform: template
+    name: "Luftfeuchtigkeit"
+    id: my_hum
+    unit_of_measurement: "%"
+    lambda: |-
+      float t_r = id(raw_temp).state;
+      float t_c = t_r + id(offset_temp).state;
+      float rh = id(raw_hum).state * exp(17.62 * ((t_r / (243.12 + t_r)) - (t_c / (243.12 + t_c))));
+      return clamp(rh + id(offset_hum).state, 0.0f, 100.0f);
+
+  - platform: wifi_signal
+    update_interval: 60s
+    id: wifi_signal_db
+    name: "WiFi Signal dBm"
+    unit_of_measurement: "dBm"
+    entity_category: diagnostic
+    on_value_range:
+      - below: -85.0
+        then:
+          - logger.log: "WiFi signal weak! Restarting to find a better network."
+          - delay: 2s
+          - button.press: esphome_reboot_button
+  
+  - platform: uptime
+    update_interval: 60s
+    name: "Uptime"
+    
+  - platform: copy
+    source_id: wifi_signal_db
+    id: wifi_signal_percent
+    name: "WiFi Signal Percent"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "Connected SSID"
+
+# --- FARBEN ---
+text:
+  - platform: template
+    name: "Farbe: Gut"
+    id: color_good
+    mode: text
+    entity_category: config
+    initial_value: "00D100" 
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Farbe: Stufe 1"
+    id: color_lim1
+    mode: text
+    entity_category: config
+    initial_value: "FFA500" 
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Farbe: Stufe 2"
+    id: color_lim2
+    mode: text
+    entity_category: config
+    initial_value: "FF4500" 
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Farbe: Stufe 3"
+    id: color_lim3
+    mode: text
+    entity_category: config
+    initial_value: "FF0000" 
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Theme Dark: Hintergrund"
+    id: color_bg_dark
+    mode: text
+    entity_category: config
+    initial_value: "000000"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: apply_theme ] }
+
+  - platform: template
+    name: "Theme Dark: Text"
+    id: color_tx_dark
+    mode: text
+    entity_category: config
+    initial_value: "FFFFFF"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: apply_theme ] }
+
+  - platform: template
+    name: "Theme Dark: Arc Inaktiv"
+    id: color_ic_dark
+    mode: text
+    entity_category: config
+    initial_value: "333333"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: apply_theme ] }
+
+  - platform: template
+    name: "Theme Light: Hintergrund"
+    id: color_bg_light
+    mode: text
+    entity_category: config
+    initial_value: "FFFFFF"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: apply_theme ] }
+
+  - platform: template
+    name: "Theme Light: Text"
+    id: color_tx_light
+    mode: text
+    entity_category: config
+    initial_value: "000000"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: apply_theme ] }
+
+  - platform: template
+    name: "Theme Light: Arc Inaktiv"
+    id: color_ic_light
+    mode: text
+    entity_category: config
+    initial_value: "CCCCCC"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: apply_theme ] }
+
+button:
+  - platform: restart
+    id: esphome_reboot_button
+    icon: mdi:power-cycle
+    name: System Reboot
+    entity_category: diagnostic
+
+select:
+  - platform: template
+    name: "Display Theme"
+    id: theme_select
+    entity_category: config
+    options: ["Dark", "Light"]
+    initial_option: "Dark"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - script.execute: apply_theme
+
+  - platform: template
+    name: "Zuweisung: Große Zahl"
+    id: sel_main
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "CO2"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Zuweisung: Bogen Außen"
+    id: sel_arc_out
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "CO2"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Zuweisung: Bogen Mitte"
+    id: sel_arc_mid
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "PM 2.5"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Zuweisung: Bogen Innen"
+    id: sel_arc_in
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "VOC"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Slot 1 (Links Oben)"
+    id: sel_s1
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "Temp"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  
+  - platform: template
+    name: "Slot 2 (Rechts Oben)"
+    id: sel_s2
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "Hum"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Slot 3 (Links Mitte)"
+    id: sel_s3
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "PM 2.5"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Slot 4 (Rechts Mitte)"
+    id: sel_s4
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "PM 10"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Slot 5 (Links Unten)"
+    id: sel_s5
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "VOC"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Slot 6 (Rechts Unten)"
+    id: sel_s6
+    entity_category: config
+    options: ["---", "CO2", "PM 1.0", "PM 2.5", "PM 4.0", "PM 10", "VOC", "NOx", "Temp", "Hum"]
+    initial_option: "NOx"
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+
+# --- 21 GRENZWERTE ---
+number:
+  # CO2
+  - platform: template
+    name: "Limit: CO2 Stufe 1"
+    id: lim_co2_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 5000
+    step: 10
+    initial_value: 1000
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: CO2 Stufe 2"
+    id: lim_co2_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 5000
+    step: 10
+    initial_value: 1250
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: CO2 Stufe 3"
+    id: lim_co2_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 5000
+    step: 10
+    initial_value: 1500
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  # PM 1.0
+  - platform: template
+    name: "Limit: PM 1.0 Stufe 1"
+    id: lim_pm1_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 10
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 1.0 Stufe 2"
+    id: lim_pm1_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 15
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 1.0 Stufe 3"
+    id: lim_pm1_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 20
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  # PM 2.5
+  - platform: template
+    name: "Limit: PM 2.5 Stufe 1"
+    id: lim_pm25_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 15
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 2.5 Stufe 2"
+    id: lim_pm25_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 25
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 2.5 Stufe 3"
+    id: lim_pm25_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 35
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  # PM 4.0
+  - platform: template
+    name: "Limit: PM 4.0 Stufe 1"
+    id: lim_pm4_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 20
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 4.0 Stufe 2"
+    id: lim_pm4_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 4.0 Stufe 3"
+    id: lim_pm4_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 40
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  # PM 10
+  - platform: template
+    name: "Limit: PM 10 Stufe 1"
+    id: lim_pm10_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 10 Stufe 2"
+    id: lim_pm10_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 40
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: PM 10 Stufe 3"
+    id: lim_pm10_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 1000
+    step: 1
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  # VOC
+  - platform: template
+    name: "Limit: VOC Stufe 1"
+    id: lim_voc_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 5
+    initial_value: 150
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: VOC Stufe 2"
+    id: lim_voc_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 5
+    initial_value: 225
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: VOC Stufe 3"
+    id: lim_voc_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 5
+    initial_value: 300
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  # NOx
+  - platform: template
+    name: "Limit: NOx Stufe 1"
+    id: lim_nox_1
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 1
+    initial_value: 10
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: NOx Stufe 2"
+    id: lim_nox_2
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 1
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+  - platform: template
+    name: "Limit: NOx Stufe 3"
+    id: lim_nox_3
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 1
+    initial_value: 100
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+
+  # --- BESTEHENDE SYSTEM NUMBER SLIDER ---
+  - platform: template
+    name: "Sensor Update Intervall"
+    id: sensor_update_slider
+    entity_category: config
+    min_value: 5
+    max_value: 300
+    step: 5
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+    on_value:
+      # HIER: Der alte "call_setup()" Quatsch ist weg. Wir starten nur das Skript neu!
+      then:
+        - script.execute: sensor_update_loop
+
+  - platform: template
+    name: "Display Refresh Intervall"
+    id: display_update_slider
+    entity_category: config
+    min_value: 1
+    max_value: 60
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+        
+  - platform: template
+    name: "Helligkeit Tag"
+    id: brightness_day
+    entity_category: config
+    unit_of_measurement: "%"
+    min_value: 5
+    max_value: 100
+    step: 5
+    initial_value: 80
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: update_backlight ] }
+
+  - platform: template
+    name: "Helligkeit Nacht"
+    id: brightness_night
+    entity_category: config
+    unit_of_measurement: "%"
+    min_value: 0
+    max_value: 100
+    step: 5
+    initial_value: 40
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: update_backlight ] }
+
+  - platform: template
+    name: "Bogen Außen: Min Wert"
+    id: num_arc_out_min
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 5000
+    step: 10
+    initial_value: 400
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Bogen Außen: Max Wert"
+    id: num_arc_out_max
+    mode: box
+    entity_category: config
+    min_value: 100
+    max_value: 10000
+    step: 100
+    initial_value: 2000
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Bogen Mitte: Min Wert"
+    id: num_arc_mid_min
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 5
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Bogen Mitte: Max Wert"
+    id: num_arc_mid_max
+    mode: box
+    entity_category: config
+    min_value: 10
+    max_value: 1000
+    step: 10
+    initial_value: 50
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Bogen Innen: Min Wert"
+    id: num_arc_in_min
+    mode: box
+    entity_category: config
+    min_value: 0
+    max_value: 500
+    step: 5
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Bogen Innen: Max Wert"
+    id: num_arc_in_max
+    mode: box
+    entity_category: config
+    min_value: 10
+    max_value: 1000
+    step: 10
+    initial_value: 500
+    optimistic: true
+    restore_value: true
+    on_value: { then: [ script.execute: display_update_loop ] }
+
+  - platform: template
+    name: "Kalibrierung Temperatur"
+    id: offset_temp
+    entity_category: config
+    min_value: -5.0
+    max_value: 5.0
+    initial_value: 0.0
+    step: 0.1
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "Kalibrierung Feuchte"
+    id: offset_hum
+    entity_category: config
+    min_value: -10.0
+    max_value: 10.0
+    initial_value: 0.0
+    step: 0.1
+    optimistic: true
+    restore_value: true
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Europe/Berlin
+    servers: ["0.de.pool.ntp.org", "time.google.com"]
+
+sun:
+  id: sun_id
+  latitude: ${my_latitude}
+  longitude: ${my_longitude}
+  on_sunset: { then: [ script.execute: update_backlight ] }
+  on_sunrise: { then: [ script.execute: update_backlight ] }
+
+output:
+  - platform: ledc
+    pin: ${pin_backlight}
+    id: backlight_pwm
+    frequency: 1000Hz 
+
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    id: display_backlight
+    restore_mode: RESTORE_DEFAULT_ON
+    internal: true
+    default_transition_length: 1s
