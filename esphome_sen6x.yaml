@@ -948,7 +948,7 @@ number:
     id: num_arc_out_max
     mode: box
     entity_category: config
-    min_value: 100
+    min_value: 0
     max_value: 10000
     step: 100
     initial_value: 2000
@@ -962,7 +962,7 @@ number:
     mode: box
     entity_category: config
     min_value: 0
-    max_value: 500
+    max_value: 5000
     step: 5
     initial_value: 0
     optimistic: true
@@ -974,8 +974,8 @@ number:
     id: num_arc_mid_max
     mode: box
     entity_category: config
-    min_value: 10
-    max_value: 1000
+    min_value: 0
+    max_value: 10000
     step: 10
     initial_value: 50
     optimistic: true
@@ -988,7 +988,7 @@ number:
     mode: box
     entity_category: config
     min_value: 0
-    max_value: 500
+    max_value: 5000
     step: 5
     initial_value: 0
     optimistic: true
@@ -1000,8 +1000,8 @@ number:
     id: num_arc_in_max
     mode: box
     entity_category: config
-    min_value: 10
-    max_value: 1000
+    min_value: 0
+    max_value: 10000
     step: 10
     initial_value: 500
     optimistic: true
@@ -1056,4 +1056,3 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
     default_transition_length: 1s
-
