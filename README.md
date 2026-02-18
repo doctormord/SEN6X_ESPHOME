@@ -1,6 +1,6 @@
 # ESPHome Air Quality System (SEN6x)
 
-![alt text](https://github.com/doctormord/SEN6X_ESPHOME/blob/main/pictures/esphome_sen6x_2.jpg "SEN6X AQS")
+![alt text](https://github.com/doctormord/SEN6X_ESPHOME/blob/main/pictures/esp32_rendering.png "SEN6X AQS")
 
 A high-end Air Quality Monitor based on the **ESP32-C3** and **Sensirion SEN66**, featuring a fully dynamic **GC9A01** round display dashboard. This project goes beyond standard ESPHome configurations by allowing real-time UI customization directly from Home Assistant without re-flashing.
 
