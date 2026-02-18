@@ -4,6 +4,8 @@
 
 A high-end Air Quality Monitor based on the **ESP32-C3** and **Sensirion SEN66**, featuring a fully dynamic **GC9A01** round display dashboard. This project goes beyond standard ESPHome configurations by allowing real-time UI customization directly from Home Assistant without re-flashing.
 
+Big Thanks at [tuct](https://github.com/tuct) for the driver and inspiration.
+
 ## 🚀 Features
 
 * **Dynamic Dashboard**: Round UI with three configurable arcs and six data slots.
