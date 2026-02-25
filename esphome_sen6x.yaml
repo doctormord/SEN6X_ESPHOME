@@ -3,8 +3,8 @@ substitutions:
   node_name: aqs-sen6x-c3
   name: "Air Quality System"
 
-  my_latitude: "52.5200"
-  my_longitude: "13.4050"
+  my_latitude: "51.1634"
+  my_longitude: "10.4477"
 
   pin_sda: 'GPIO06'
   pin_scl: 'GPIO07'
@@ -1056,3 +1056,4 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
     default_transition_length: 1s
+
