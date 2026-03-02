@@ -3,8 +3,8 @@ substitutions:
   node_name: aqs-sen6x-c3
   name: "Air Quality System"
 
-  my_latitude: "51.1634"
-  my_longitude: "10.4477"
+  my_latitude: "52.5200"
+  my_longitude: "13.4050"
 
   pin_sda: 'GPIO06'
   pin_scl: 'GPIO07'
@@ -31,8 +31,7 @@ esphome:
           id: display_backlight
           brightness: 100% 
       - script.execute: apply_theme
-      - script.execute: sensor_update_loop
-      - script.execute: display_update_loop
+      
       - wait_until: { time.has_time: }
       - script.execute: update_backlight
 
@@ -89,8 +88,11 @@ binary_sensor:
       return true;
 
 logger:
-  level: INFO
-  baud_rate: 0
+  level: DEBUG
+  #baud_rate: 0
+  
+ 
+debug: 
 
 i2c:
   sda: ${pin_sda}
@@ -148,139 +150,160 @@ lvgl:
     - arc: { id: arc_middle, width: 212, height: 212, align: CENTER, start_angle: 135, end_angle: 45, arc_width: 10 }
     - arc: { id: arc_inner, width: 184, height: 184, align: CENTER, start_angle: 135, end_angle: 45, arc_width: 10 }
 
-script:
-  # HERE: The lost 24-hour trick is back!
-  - id: sensor_update_loop
-    mode: restart
+interval:
+  # --- 1. SENSOR UPDATE ENGINE (Dein Original-Befehl, stabil verpackt) ---
+  - interval: 1s
+    id: interval_sensor_update
     then:
-      - component.update: sen54 
-      - delay: !lambda |-
-          float s = id(sensor_update_slider).state;
-          if (std::isnan(s) || s < 5) s = 30.0; 
-          return s * 1000;
-      - script.execute: sensor_update_loop
+      - if:
+          condition:
+            lambda: |-
+              static uint32_t last_sensor_update = 0;
+              uint32_t now = millis();
+              
+              float s = id(sensor_update_slider).state;
+              if (std::isnan(s) || s < 5) s = 30.0; 
+              
+              if (now - last_sensor_update >= (uint32_t)(s * 1000)) {
+                last_sensor_update = now;
+                return true; // Löst das 'then' aus
+              }
+              return false;
+          then:
+            # Hier ist dein funktionierender Original-Aufruf!
+            - component.update: sen54
 
-  - id: display_update_loop
-    mode: restart
+  # --- 2. DISPLAY UPDATE ENGINE ---
+  - interval: 1s
+    id: interval_display_update
     then:
       - lambda: |-
-          if (!id(my_display).is_ready()) return;
-
-          auto get_val = [&](const std::string& t) -> float {
-            if (t == "CO2") return id(my_co2).state;
-            if (t == "PM 1.0") return id(my_pm1).state;
-            if (t == "PM 2.5") return id(my_pm25).state;
-            if (t == "PM 4.0") return id(my_pm4).state;
-            if (t == "PM 10") return id(my_pm10).state;
-            if (t == "VOC") return id(my_voc).state;
-            if (t == "NOx") return id(my_nox).state;
-            if (t == "Temp") return id(my_temp).state;
-            if (t == "Hum") return id(my_hum).state;
-            return NAN;
-          };
-
-          auto get_col = [&](const std::string& t, float v) -> lv_color_t {
-            if (std::isnan(v)) return lv_color_hex(0x555555);
-            
-            lv_color_t c_good = lv_color_hex(strtol(id(color_good).state.c_str(), NULL, 16));
-            lv_color_t c_lim1 = lv_color_hex(strtol(id(color_lim1).state.c_str(), NULL, 16));
-            lv_color_t c_lim2 = lv_color_hex(strtol(id(color_lim2).state.c_str(), NULL, 16));
-            lv_color_t c_lim3 = lv_color_hex(strtol(id(color_lim3).state.c_str(), NULL, 16));
-            
-            if (t == "CO2") {
-              if (v >= id(lim_co2_3).state) return c_lim3;
-              if (v >= id(lim_co2_2).state) return c_lim2;
-              if (v >= id(lim_co2_1).state) return c_lim1;
-            } else if (t == "PM 1.0") {
-              if (v >= id(lim_pm1_3).state) return c_lim3;
-              if (v >= id(lim_pm1_2).state) return c_lim2;
-              if (v >= id(lim_pm1_1).state) return c_lim1;
-            } else if (t == "PM 2.5") {
-              if (v >= id(lim_pm25_3).state) return c_lim3;
-              if (v >= id(lim_pm25_2).state) return c_lim2;
-              if (v >= id(lim_pm25_1).state) return c_lim1;
-            } else if (t == "PM 4.0") {
-              if (v >= id(lim_pm4_3).state) return c_lim3;
-              if (v >= id(lim_pm4_2).state) return c_lim2;
-              if (v >= id(lim_pm4_1).state) return c_lim1;
-            } else if (t == "PM 10") {
-              if (v >= id(lim_pm10_3).state) return c_lim3;
-              if (v >= id(lim_pm10_2).state) return c_lim2;
-              if (v >= id(lim_pm10_1).state) return c_lim1;
-            } else if (t == "VOC") {
-              if (v >= id(lim_voc_3).state) return c_lim3;
-              if (v >= id(lim_voc_2).state) return c_lim2;
-              if (v >= id(lim_voc_1).state) return c_lim1;
-            } else if (t == "NOx") {
-              if (v >= id(lim_nox_3).state) return c_lim3;
-              if (v >= id(lim_nox_2).state) return c_lim2;
-              if (v >= id(lim_nox_1).state) return c_lim1;
-            }
-            return c_good;
-          };
-
-          auto get_fmt = [&](const std::string& t, float v, bool is_slot) -> std::string {
-            if (t == "---" || std::isnan(v)) return "---";
-            if (is_slot) {
-              if (t == "CO2") return str_sprintf("CO2:%.0f", v);
-              if (t == "PM 1.0") return str_sprintf("PM1:%.0f", v);
-              if (t == "PM 2.5") return str_sprintf("PM2.5:%.0f", v);
-              if (t == "PM 4.0") return str_sprintf("PM4:%.0f", v);
-              if (t == "PM 10") return str_sprintf("PM10:%.0f", v);
-              if (t == "VOC") return str_sprintf("V:%.0f", v);
-              if (t == "NOx") return str_sprintf("N:%.0f", v);
-              if (t == "Temp") return str_sprintf("%.1f°C", v);
-              if (t == "Hum") return str_sprintf("%.0f%%", v);
-            } else {
-              if (t == "Temp") return str_sprintf("%.1f", v);
-              return str_sprintf("%.0f", v);
-            }
-            return "---";
-          };
-
-          bool is_l = (id(theme_select).current_option() == "Light");
-          lv_color_t arc_inact = is_l ? lv_color_hex(strtol(id(color_ic_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_ic_dark).state.c_str(), NULL, 16));
-          lv_color_t tx_main = is_l ? lv_color_hex(strtol(id(color_tx_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_tx_dark).state.c_str(), NULL, 16));
-
-          auto upd_arc = [&](lv_obj_t* arc, const std::string& t, float min_v, float max_v) {
-            lv_arc_set_range(arc, min_v, max_v);
-            float v = get_val(t);
-            if (t == "---" || std::isnan(v)) {
-              lv_arc_set_value(arc, min_v); 
-              lv_obj_set_style_arc_color(arc, arc_inact, LV_PART_INDICATOR);
-            } else {
-              lv_arc_set_value(arc, v);
-              lv_obj_set_style_arc_color(arc, get_col(t, v), LV_PART_INDICATOR);
-            }
-          };
-
-          upd_arc(id(arc_outer), id(sel_arc_out).state, id(num_arc_out_min).state, id(num_arc_out_max).state);
-          upd_arc(id(arc_middle), id(sel_arc_mid).state, id(num_arc_mid_min).state, id(num_arc_mid_max).state);
-          upd_arc(id(arc_inner), id(sel_arc_in).state, id(num_arc_in_min).state, id(num_arc_in_max).state);
-
-          std::string m_t = id(sel_main).state;
-          float m_v = get_val(m_t);
-          lv_label_set_text(id(label_main), get_fmt(m_t, m_v, false).c_str());
+          static uint32_t last_display_update = 0;
+          uint32_t now = millis();
           
-          if (m_t == "---" || std::isnan(m_v)) {
-            lv_obj_set_style_text_color(id(label_main), tx_main, LV_PART_MAIN);
-          } else {
-            lv_obj_set_style_text_color(id(label_main), get_col(m_t, m_v), LV_PART_MAIN);
+          float d = id(display_update_slider).state;
+          if (std::isnan(d) || d < 1) d = 5.0;
+          
+          if (now - last_display_update >= (uint32_t)(d * 1000)) {
+            last_display_update = now; 
+
+            if (!id(my_display).is_ready()) return;
+
+            auto get_val = [&](const std::string& t) -> float {
+              if (t == "CO2") return id(my_co2).state;
+              if (t == "PM 1.0") return id(my_pm1).state;
+              if (t == "PM 2.5") return id(my_pm25).state;
+              if (t == "PM 4.0") return id(my_pm4).state;
+              if (t == "PM 10") return id(my_pm10).state;
+              if (t == "VOC") return id(my_voc).state;
+              if (t == "NOx") return id(my_nox).state;
+              if (t == "Temp") return id(my_temp).state;
+              if (t == "Hum") return id(my_hum).state;
+              return NAN;
+            };
+
+            auto get_col = [&](const std::string& t, float v) -> lv_color_t {
+              if (std::isnan(v)) return lv_color_hex(0x555555);
+              
+              lv_color_t c_good = lv_color_hex(strtol(id(color_good).state.c_str(), NULL, 16));
+              lv_color_t c_lim1 = lv_color_hex(strtol(id(color_lim1).state.c_str(), NULL, 16));
+              lv_color_t c_lim2 = lv_color_hex(strtol(id(color_lim2).state.c_str(), NULL, 16));
+              lv_color_t c_lim3 = lv_color_hex(strtol(id(color_lim3).state.c_str(), NULL, 16));
+              
+              if (t == "CO2") {
+                if (v >= id(lim_co2_3).state) return c_lim3;
+                if (v >= id(lim_co2_2).state) return c_lim2;
+                if (v >= id(lim_co2_1).state) return c_lim1;
+              } else if (t == "PM 1.0") {
+                if (v >= id(lim_pm1_3).state) return c_lim3;
+                if (v >= id(lim_pm1_2).state) return c_lim2;
+                if (v >= id(lim_pm1_1).state) return c_lim1;
+              } else if (t == "PM 2.5") {
+                if (v >= id(lim_pm25_3).state) return c_lim3;
+                if (v >= id(lim_pm25_2).state) return c_lim2;
+                if (v >= id(lim_pm25_1).state) return c_lim1;
+              } else if (t == "PM 4.0") {
+                if (v >= id(lim_pm4_3).state) return c_lim3;
+                if (v >= id(lim_pm4_2).state) return c_lim2;
+                if (v >= id(lim_pm4_1).state) return c_lim1;
+              } else if (t == "PM 10") {
+                if (v >= id(lim_pm10_3).state) return c_lim3;
+                if (v >= id(lim_pm10_2).state) return c_lim2;
+                if (v >= id(lim_pm10_1).state) return c_lim1;
+              } else if (t == "VOC") {
+                if (v >= id(lim_voc_3).state) return c_lim3;
+                if (v >= id(lim_voc_2).state) return c_lim2;
+                if (v >= id(lim_voc_1).state) return c_lim1;
+              } else if (t == "NOx") {
+                if (v >= id(lim_nox_3).state) return c_lim3;
+                if (v >= id(lim_nox_2).state) return c_lim2;
+                if (v >= id(lim_nox_1).state) return c_lim1;
+              }
+              return c_good;
+            };
+
+            auto get_fmt = [&](const std::string& t, float v, bool is_slot) -> std::string {
+              if (t == "---" || std::isnan(v)) return "---";
+              if (is_slot) {
+                if (t == "CO2") return str_sprintf("CO2:%.0f", v);
+                if (t == "PM 1.0") return str_sprintf("PM1:%.0f", v);
+                if (t == "PM 2.5") return str_sprintf("PM2.5:%.0f", v);
+                if (t == "PM 4.0") return str_sprintf("PM4:%.0f", v);
+                if (t == "PM 10") return str_sprintf("PM10:%.0f", v);
+                if (t == "VOC") return str_sprintf("V:%.0f", v);
+                if (t == "NOx") return str_sprintf("N:%.0f", v);
+                if (t == "Temp") return str_sprintf("%.1f°C", v);
+                if (t == "Hum") return str_sprintf("%.0f%%", v);
+              } else {
+                if (t == "Temp") return str_sprintf("%.1f", v);
+                return str_sprintf("%.0f", v);
+              }
+              return "---";
+            };
+
+            bool is_l = (id(theme_select).current_option() == "Light");
+            lv_color_t arc_inact = is_l ? lv_color_hex(strtol(id(color_ic_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_ic_dark).state.c_str(), NULL, 16));
+            lv_color_t tx_main = is_l ? lv_color_hex(strtol(id(color_tx_light).state.c_str(), NULL, 16)) : lv_color_hex(strtol(id(color_tx_dark).state.c_str(), NULL, 16));
+
+            auto upd_arc = [&](lv_obj_t* arc, const std::string& t, float min_v, float max_v) {
+              lv_arc_set_range(arc, min_v, max_v);
+              float v = get_val(t);
+              if (t == "---" || std::isnan(v)) {
+                lv_arc_set_value(arc, min_v); 
+                lv_obj_set_style_arc_color(arc, arc_inact, LV_PART_INDICATOR);
+              } else {
+                lv_arc_set_value(arc, v);
+                lv_obj_set_style_arc_color(arc, get_col(t, v), LV_PART_INDICATOR);
+              }
+            };
+
+            upd_arc(id(arc_outer), id(sel_arc_out).current_option(), id(num_arc_out_min).state, id(num_arc_out_max).state);
+            upd_arc(id(arc_middle), id(sel_arc_mid).current_option(), id(num_arc_mid_min).state, id(num_arc_mid_max).state);
+            upd_arc(id(arc_inner), id(sel_arc_in).current_option(), id(num_arc_in_min).state, id(num_arc_in_max).state);
+
+            std::string m_t = id(sel_main).current_option();
+            float m_v = get_val(m_t);
+            lv_label_set_text(id(label_main), get_fmt(m_t, m_v, false).c_str());
+            
+            if (m_t == "---" || std::isnan(m_v)) {
+              lv_obj_set_style_text_color(id(label_main), tx_main, LV_PART_MAIN);
+            } else {
+              lv_obj_set_style_text_color(id(label_main), get_col(m_t, m_v), LV_PART_MAIN);
+            }
+
+            auto r1 = get_fmt(id(sel_s1).current_option(), get_val(id(sel_s1).current_option()), true) + " | " + get_fmt(id(sel_s2).current_option(), get_val(id(sel_s2).current_option()), true);
+            auto r2 = get_fmt(id(sel_s3).current_option(), get_val(id(sel_s3).current_option()), true) + " | " + get_fmt(id(sel_s4).current_option(), get_val(id(sel_s4).current_option()), true);
+            auto r3 = get_fmt(id(sel_s5).current_option(), get_val(id(sel_s5).current_option()), true) + " | " + get_fmt(id(sel_s6).current_option(), get_val(id(sel_s6).current_option()), true);
+            
+            lv_label_set_text(id(label_row1), r1 == "--- | ---" ? "" : r1.c_str());
+            lv_label_set_text(id(label_row2), r2 == "--- | ---" ? "" : r2.c_str());
+            lv_label_set_text(id(label_row3), r3 == "--- | ---" ? "" : r3.c_str());
+            
+            std::string wifi_str = id(wifi_signal_percent).has_state() ? str_sprintf("WiFi: %.0f%%", id(wifi_signal_percent).state) : "WiFi: ---";
+            lv_label_set_text(id(label_wifi), wifi_str.c_str());
           }
 
-          auto r1 = get_fmt(id(sel_s1).state, get_val(id(sel_s1).state), true) + " | " + get_fmt(id(sel_s2).state, get_val(id(sel_s2).state), true);
-          auto r2 = get_fmt(id(sel_s3).state, get_val(id(sel_s3).state), true) + " | " + get_fmt(id(sel_s4).state, get_val(id(sel_s4).state), true);
-          auto r3 = get_fmt(id(sel_s5).state, get_val(id(sel_s5).state), true) + " | " + get_fmt(id(sel_s6).state, get_val(id(sel_s6).state), true);
-          
-          lv_label_set_text(id(label_row1), r1 == "--- | ---" ? "" : r1.c_str());
-          lv_label_set_text(id(label_row2), r2 == "--- | ---" ? "" : r2.c_str());
-          lv_label_set_text(id(label_row3), r3 == "--- | ---" ? "" : r3.c_str());
-          
-          std::string wifi_str = id(wifi_signal_percent).has_state() ? str_sprintf("WiFi: %.0f%%", id(wifi_signal_percent).state) : "WiFi: ---";
-          lv_label_set_text(id(label_wifi), wifi_str.c_str());
-
-      - delay: !lambda "return id(display_update_slider).state * 1000;"
-      - script.execute: display_update_loop
+script:
 
   - id: apply_theme
     then:
@@ -303,7 +326,7 @@ script:
           lv_obj_set_style_arc_color(id(arc_outer), bg, LV_PART_MAIN);
           lv_obj_set_style_arc_color(id(arc_middle), bg, LV_PART_MAIN);
           lv_obj_set_style_arc_color(id(arc_inner), bg, LV_PART_MAIN);
-      - script.execute: display_update_loop
+      
 
   - id: update_backlight
     then:
@@ -376,6 +399,10 @@ sensor:
     filters:
       - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
     unit_of_measurement: "%"
+    
+  - platform: debug
+    free:
+      name: "Heap Free Memory"
 
 text_sensor:
   - platform: wifi_info
@@ -394,7 +421,7 @@ text:
     initial_value: "00D100" 
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Color: Level 1"
@@ -404,7 +431,7 @@ text:
     initial_value: "FFA500" 
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Color: Level 2"
@@ -414,7 +441,7 @@ text:
     initial_value: "FF4500" 
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Color: Level 3"
@@ -424,7 +451,7 @@ text:
     initial_value: "FF0000" 
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Theme Dark: Background"
@@ -434,7 +461,7 @@ text:
     initial_value: "000000"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: apply_theme ] }
+    # on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
     name: "Theme Dark: Text"
@@ -444,7 +471,7 @@ text:
     initial_value: "FFFFFF"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: apply_theme ] }
+    # on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
     name: "Theme Dark: Arc Inactive"
@@ -454,7 +481,7 @@ text:
     initial_value: "333333"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: apply_theme ] }
+    # on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
     name: "Theme Light: Background"
@@ -464,7 +491,7 @@ text:
     initial_value: "FFFFFF"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: apply_theme ] }
+    # on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
     name: "Theme Light: Text"
@@ -474,7 +501,7 @@ text:
     initial_value: "000000"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: apply_theme ] }
+    # on_value: { then: [ script.execute: apply_theme ] }
 
   - platform: template
     name: "Theme Light: Arc Inactive"
@@ -484,7 +511,7 @@ text:
     initial_value: "CCCCCC"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: apply_theme ] }
+    # on_value: { then: [ script.execute: apply_theme ] }
 
 button:
   - platform: restart
@@ -514,7 +541,7 @@ select:
     initial_option: "CO2"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Assignment: Outer Arc"
@@ -524,7 +551,7 @@ select:
     initial_option: "CO2"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Assignment: Middle Arc"
@@ -534,7 +561,7 @@ select:
     initial_option: "PM 2.5"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Assignment: Inner Arc"
@@ -544,7 +571,7 @@ select:
     initial_option: "VOC"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Slot 1 (Top Left)"
@@ -554,7 +581,7 @@ select:
     initial_option: "Temp"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   
   - platform: template
     name: "Slot 2 (Top Right)"
@@ -564,7 +591,7 @@ select:
     initial_option: "Hum"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Slot 3 (Mid Left)"
@@ -574,7 +601,7 @@ select:
     initial_option: "PM 2.5"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Slot 4 (Mid Right)"
@@ -584,7 +611,7 @@ select:
     initial_option: "PM 10"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Slot 5 (Bottom Left)"
@@ -594,7 +621,7 @@ select:
     initial_option: "VOC"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Slot 6 (Bottom Right)"
@@ -604,7 +631,7 @@ select:
     initial_option: "NOx"
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
 
 # --- 21 THRESHOLDS ---
@@ -621,7 +648,7 @@ number:
     initial_value: 1000
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: CO2 Level 2"
     id: lim_co2_2
@@ -633,7 +660,7 @@ number:
     initial_value: 1250
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: CO2 Level 3"
     id: lim_co2_3
@@ -645,7 +672,7 @@ number:
     initial_value: 1500
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   # PM 1.0
   - platform: template
@@ -659,7 +686,7 @@ number:
     initial_value: 10
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 1.0 Level 2"
     id: lim_pm1_2
@@ -671,7 +698,7 @@ number:
     initial_value: 15
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 1.0 Level 3"
     id: lim_pm1_3
@@ -683,7 +710,7 @@ number:
     initial_value: 20
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   # PM 2.5
   - platform: template
@@ -697,7 +724,7 @@ number:
     initial_value: 15
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 2.5 Level 2"
     id: lim_pm25_2
@@ -709,7 +736,7 @@ number:
     initial_value: 25
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 2.5 Level 3"
     id: lim_pm25_3
@@ -721,7 +748,7 @@ number:
     initial_value: 35
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   # PM 4.0
   - platform: template
@@ -735,7 +762,7 @@ number:
     initial_value: 20
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 4.0 Level 2"
     id: lim_pm4_2
@@ -747,7 +774,7 @@ number:
     initial_value: 30
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 4.0 Level 3"
     id: lim_pm4_3
@@ -759,7 +786,7 @@ number:
     initial_value: 40
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   # PM 10
   - platform: template
@@ -773,7 +800,7 @@ number:
     initial_value: 30
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 10 Level 2"
     id: lim_pm10_2
@@ -785,7 +812,7 @@ number:
     initial_value: 40
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: PM 10 Level 3"
     id: lim_pm10_3
@@ -797,7 +824,7 @@ number:
     initial_value: 50
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   # VOC
   - platform: template
@@ -811,7 +838,7 @@ number:
     initial_value: 150
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: VOC Level 2"
     id: lim_voc_2
@@ -823,7 +850,7 @@ number:
     initial_value: 225
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: VOC Level 3"
     id: lim_voc_3
@@ -835,7 +862,7 @@ number:
     initial_value: 300
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   # NOx
   - platform: template
@@ -849,7 +876,7 @@ number:
     initial_value: 10
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: NOx Level 2"
     id: lim_nox_2
@@ -861,7 +888,7 @@ number:
     initial_value: 50
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
   - platform: template
     name: "Limit: NOx Level 3"
     id: lim_nox_3
@@ -873,7 +900,7 @@ number:
     initial_value: 100
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
 
   # --- EXISTING SYSTEM NUMBER SLIDERS ---
@@ -890,7 +917,7 @@ number:
     on_value:
       # HERE: The old "call_setup()" nonsense is gone. We only restart the script!
       then:
-        - script.execute: sensor_update_loop
+        # - script.execute: sensor_update_loop
 
   - platform: template
     name: "Display Refresh Interval"
@@ -902,7 +929,7 @@ number:
     initial_value: 5
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
         
   - platform: template
     name: "Brightness Day"
@@ -915,7 +942,7 @@ number:
     initial_value: 80
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: update_backlight ] }
+    # on_value: { then: [ script.execute: update_backlight ] }
 
   - platform: template
     name: "Brightness Night"
@@ -928,7 +955,7 @@ number:
     initial_value: 40
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: update_backlight ] }
+    # on_value: { then: [ script.execute: update_backlight ] }
 
   - platform: template
     name: "Outer Arc: Min Value"
@@ -941,7 +968,7 @@ number:
     initial_value: 400
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Outer Arc: Max Value"
@@ -954,7 +981,7 @@ number:
     initial_value: 2000
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Middle Arc: Min Value"
@@ -967,7 +994,7 @@ number:
     initial_value: 0
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Middle Arc: Max Value"
@@ -980,7 +1007,7 @@ number:
     initial_value: 50
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Inner Arc: Min Value"
@@ -993,7 +1020,7 @@ number:
     initial_value: 0
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Inner Arc: Max Value"
@@ -1006,7 +1033,7 @@ number:
     initial_value: 500
     optimistic: true
     restore_value: true
-    on_value: { then: [ script.execute: display_update_loop ] }
+    # on_value: { then: [ script.execute: display_update_loop ] }
 
   - platform: template
     name: "Calibration Temperature"
@@ -1056,4 +1083,3 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
     default_transition_length: 1s
-
