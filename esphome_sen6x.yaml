@@ -421,7 +421,7 @@ text:
     initial_value: "00D100" 
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Color: Level 1"
@@ -431,7 +431,7 @@ text:
     initial_value: "FFA500" 
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Color: Level 2"
@@ -441,7 +441,7 @@ text:
     initial_value: "FF4500" 
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Color: Level 3"
@@ -451,7 +451,7 @@ text:
     initial_value: "FF0000" 
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Theme Dark: Background"
@@ -541,7 +541,7 @@ select:
     initial_option: "CO2"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Assignment: Outer Arc"
@@ -551,7 +551,7 @@ select:
     initial_option: "CO2"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Assignment: Middle Arc"
@@ -561,7 +561,7 @@ select:
     initial_option: "PM 2.5"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Assignment: Inner Arc"
@@ -571,7 +571,7 @@ select:
     initial_option: "VOC"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Slot 1 (Top Left)"
@@ -581,7 +581,7 @@ select:
     initial_option: "Temp"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   
   - platform: template
     name: "Slot 2 (Top Right)"
@@ -591,7 +591,7 @@ select:
     initial_option: "Hum"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Slot 3 (Mid Left)"
@@ -601,7 +601,7 @@ select:
     initial_option: "PM 2.5"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Slot 4 (Mid Right)"
@@ -611,7 +611,7 @@ select:
     initial_option: "PM 10"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Slot 5 (Bottom Left)"
@@ -621,7 +621,7 @@ select:
     initial_option: "VOC"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Slot 6 (Bottom Right)"
@@ -631,7 +631,7 @@ select:
     initial_option: "NOx"
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
 
 # --- 21 THRESHOLDS ---
@@ -648,7 +648,7 @@ number:
     initial_value: 1000
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: CO2 Level 2"
     id: lim_co2_2
@@ -660,7 +660,7 @@ number:
     initial_value: 1250
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: CO2 Level 3"
     id: lim_co2_3
@@ -672,7 +672,7 @@ number:
     initial_value: 1500
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   # PM 1.0
   - platform: template
@@ -686,7 +686,7 @@ number:
     initial_value: 10
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 1.0 Level 2"
     id: lim_pm1_2
@@ -698,7 +698,7 @@ number:
     initial_value: 15
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 1.0 Level 3"
     id: lim_pm1_3
@@ -710,7 +710,7 @@ number:
     initial_value: 20
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   # PM 2.5
   - platform: template
@@ -724,7 +724,7 @@ number:
     initial_value: 15
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 2.5 Level 2"
     id: lim_pm25_2
@@ -736,7 +736,7 @@ number:
     initial_value: 25
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 2.5 Level 3"
     id: lim_pm25_3
@@ -748,7 +748,7 @@ number:
     initial_value: 35
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   # PM 4.0
   - platform: template
@@ -762,7 +762,7 @@ number:
     initial_value: 20
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 4.0 Level 2"
     id: lim_pm4_2
@@ -774,7 +774,7 @@ number:
     initial_value: 30
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 4.0 Level 3"
     id: lim_pm4_3
@@ -786,7 +786,7 @@ number:
     initial_value: 40
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   # PM 10
   - platform: template
@@ -800,7 +800,7 @@ number:
     initial_value: 30
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 10 Level 2"
     id: lim_pm10_2
@@ -812,7 +812,7 @@ number:
     initial_value: 40
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: PM 10 Level 3"
     id: lim_pm10_3
@@ -824,7 +824,7 @@ number:
     initial_value: 50
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   # VOC
   - platform: template
@@ -838,7 +838,7 @@ number:
     initial_value: 150
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: VOC Level 2"
     id: lim_voc_2
@@ -850,7 +850,7 @@ number:
     initial_value: 225
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: VOC Level 3"
     id: lim_voc_3
@@ -862,7 +862,7 @@ number:
     initial_value: 300
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   # NOx
   - platform: template
@@ -876,7 +876,7 @@ number:
     initial_value: 10
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: NOx Level 2"
     id: lim_nox_2
@@ -888,7 +888,7 @@ number:
     initial_value: 50
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
   - platform: template
     name: "Limit: NOx Level 3"
     id: lim_nox_3
@@ -900,7 +900,7 @@ number:
     initial_value: 100
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
 
   # --- EXISTING SYSTEM NUMBER SLIDERS ---
@@ -929,7 +929,7 @@ number:
     initial_value: 5
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
         
   - platform: template
     name: "Brightness Day"
@@ -942,7 +942,7 @@ number:
     initial_value: 80
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: update_backlight ] }
+     on_value: { then: [ script.execute: update_backlight ] }
 
   - platform: template
     name: "Brightness Night"
@@ -955,7 +955,7 @@ number:
     initial_value: 40
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: update_backlight ] }
+     on_value: { then: [ script.execute: update_backlight ] }
 
   - platform: template
     name: "Outer Arc: Min Value"
@@ -968,7 +968,7 @@ number:
     initial_value: 400
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Outer Arc: Max Value"
@@ -981,7 +981,7 @@ number:
     initial_value: 2000
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Middle Arc: Min Value"
@@ -994,7 +994,7 @@ number:
     initial_value: 0
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Middle Arc: Max Value"
@@ -1007,7 +1007,7 @@ number:
     initial_value: 50
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Inner Arc: Min Value"
@@ -1020,7 +1020,7 @@ number:
     initial_value: 0
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Inner Arc: Max Value"
@@ -1033,7 +1033,7 @@ number:
     initial_value: 500
     optimistic: true
     restore_value: true
-    # on_value: { then: [ script.execute: display_update_loop ] }
+
 
   - platform: template
     name: "Calibration Temperature"
