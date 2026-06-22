@@ -78,16 +78,7 @@ web_server:
 #      ref: main
 #    components: [ sen6x ]
 
-external_components:
-  - source:
-      type: local
-      path: custom_components
-
 binary_sensor:
-  - platform: sen6x
-    id: sen6x_status
-    sen6x_id: sen54
-
   - platform: template
     name: "SEN66 Ready"
     id: sensor_functional
@@ -121,16 +112,17 @@ font:
     bpp: 4
 
 display:
-  - platform: ili9xxx
+  - platform: mipi_spi
     id: my_display
     model: GC9A01A
     spi_id: spi_bus
     cs_pin: ${pin_cs}
     dc_pin: ${pin_dc}
     reset_pin: ${pin_reset}
-    data_rate: 80MHz
-    spi_mode: mode3
-    dimensions: { height: 240, width: 240 }
+    data_rate: 20MHz
+    dimensions:
+      height: 240
+      width: 240
     invert_colors: true
 
 lvgl:
@@ -319,9 +311,9 @@ interval:
             }
             
             lv_color_t target_col = (idx == 0 || std::isnan(v)) ? arc_inact : get_col(idx, v);
-            if (target_col.full != last_c) {
+            if (lv_color_to_u32(target_col) != last_c) {
               lv_obj_set_style_arc_color(arc, target_col, LV_PART_INDICATOR);
-              last_c = target_col.full;
+              last_c = lv_color_to_u32(target_col);
             }
           };
 
@@ -342,9 +334,9 @@ interval:
           }
           
           lv_color_t main_col = (m_idx == 0 || std::isnan(m_v)) ? tx_main : get_col(m_idx, m_v);
-          if (main_col.full != last_c_main) {
+          if (lv_color_to_u32(main_col) != last_c) {
             lv_obj_set_style_text_color(id(label_main), main_col, LV_PART_MAIN);
-            last_c_main = main_col.full;
+            last_c_main = lv_color_to_u32(main_col);
           }
 
           // ================= SLOTS =================
