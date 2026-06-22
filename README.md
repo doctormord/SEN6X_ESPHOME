@@ -43,6 +43,7 @@ This project utilizes the following external resources:
 
 * **SEN6x ESPHome Component**: Custom driver for advanced Sensirion features.
     * Repo: [tuct/esphome-projects](https://github.com/tuct/esphome-projects)
+    * NOW OBSOLETE, USING NATIVE ESPHOME DRIVER
 * **LVGL**: Graphics library used via the [ESPHome LVGL component](https://esphome.io/components/lvgl/).
 * **Google Fonts**: Uses the "Rubik" font family for a modern look.
 
